@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tenpulse
+      POSTGRES_PASSWORD: tenpulse123
+      POSTGRES_DB: tenpulse
+    ports:
+      - '5455:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U tenpulse']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - '4015:4015'
+    environment:
+      DATABASE_URL: postgresql://tenpulse:tenpulse123@postgres:5432/tenpulse?schema=public
+      JWT_SECRET: tenpulse-dev-secret
+      FRONTEND_URL: http://localhost:3015
+      PORT: 4015
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: npm run deploy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - '3015:3015'
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4015/api
+    depends_on:
+      - backend
