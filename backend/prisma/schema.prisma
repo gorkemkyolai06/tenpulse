@@ -1,0 +1,254 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  owner
+  manager
+  front_desk
+}
+
+enum CourtSurface {
+  clay
+  hard
+  grass
+  indoor
+}
+
+enum CourtStatus {
+  available
+  in_use
+  maintenance
+  closed
+}
+
+enum SessionStatus {
+  recorded
+  verified
+  disputed
+}
+
+enum LessonType {
+  private
+  group
+  clinic
+  camp
+}
+
+enum BallMachinePriority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum BallMachineStatus {
+  open
+  in_progress
+  completed
+  cancelled
+}
+
+enum CourtMaintenanceCategory {
+  resurfacing
+  net_replacement
+  line_painting
+  lighting
+  drainage
+  other
+}
+
+enum CourtMaintenanceStatus {
+  scheduled
+  in_progress
+  completed
+  overdue
+}
+
+enum RateCategory {
+  court_rental
+  lesson_package
+  league_night
+  clinic
+  group_event
+  other
+}
+
+enum RateStatus {
+  active
+  upcoming
+  archived
+}
+
+enum StringingStatus {
+  pending
+  in_progress
+  completed
+  delivered
+}
+
+model TennisClub {
+  id          String   @id @default(uuid())
+  name        String
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?  @map("zip_code")
+  totalCourts Int      @default(8) @map("total_courts")
+  timezone    String   @default("America/Phoenix")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users                  User[]
+  courts                 Court[]
+  lessonSessions         LessonSession[]
+  ballMachineMaintenance BallMachineMaintenance[]
+  courtMaintenance       CourtMaintenance[]
+  rateTiers              RateTier[]
+  stringingOrders        StringingOrder[]
+
+  @@map("tennis_clubs")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  role         UserRole @default(owner)
+  tennisClubId String   @map("tennis_club_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tennisClub TennisClub @relation(fields: [tennisClubId], references: [id], onDelete: Cascade)
+
+  @@map("users")
+}
+
+model Court {
+  id              String       @id @default(uuid())
+  tennisClubId    String       @map("tennis_club_id")
+  name            String
+  wing            String
+  surface         CourtSurface @default(hard)
+  ballMachineSpec String?      @map("ball_machine_spec")
+  status          CourtStatus  @default(available)
+  notes           String?
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  tennisClub             TennisClub               @relation(fields: [tennisClubId], references: [id], onDelete: Cascade)
+  lessonSessions         LessonSession[]
+  ballMachineMaintenance BallMachineMaintenance[]
+
+  @@unique([tennisClubId, name])
+  @@index([tennisClubId, status])
+  @@map("courts")
+}
+
+model LessonSession {
+  id                      String        @id @default(uuid())
+  tennisClubId            String        @map("tennis_club_id")
+  courtId                 String        @map("court_id")
+  sessionAt               DateTime      @map("session_at")
+  lessonType              LessonType    @default(private) @map("lesson_type")
+  cashAmount              Float         @default(0) @map("cash_amount")
+  cardAmount              Float         @default(0) @map("card_amount")
+  participants            Int           @default(0)
+  ballMachineRentalRevenue Float         @default(0) @map("ball_machine_rental_revenue")
+  status                  SessionStatus @default(recorded)
+  notes                   String?
+  createdAt               DateTime      @default(now()) @map("created_at")
+  updatedAt               DateTime      @updatedAt @map("updated_at")
+
+  tennisClub TennisClub @relation(fields: [tennisClubId], references: [id], onDelete: Cascade)
+  court      Court      @relation(fields: [courtId], references: [id], onDelete: Cascade)
+
+  @@index([tennisClubId, sessionAt])
+  @@index([tennisClubId, status])
+  @@map("lesson_sessions")
+}
+
+model BallMachineMaintenance {
+  id           String              @id @default(uuid())
+  tennisClubId String              @map("tennis_club_id")
+  courtId      String              @map("court_id")
+  title        String
+  description  String?
+  reportedAt   DateTime            @map("reported_at")
+  completedAt  DateTime?           @map("completed_at")
+  priority     BallMachinePriority @default(medium)
+  status       BallMachineStatus   @default(open)
+  cost         Float?
+  notes        String?
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+
+  tennisClub TennisClub @relation(fields: [tennisClubId], references: [id], onDelete: Cascade)
+  court      Court      @relation(fields: [courtId], references: [id], onDelete: Cascade)
+
+  @@index([tennisClubId, status])
+  @@index([tennisClubId, priority])
+  @@map("ball_machine_maintenance")
+}
+
+model CourtMaintenance {
+  id           String                   @id @default(uuid())
+  tennisClubId String                   @map("tennis_club_id")
+  title        String
+  description  String?
+  category     CourtMaintenanceCategory @default(other)
+  wing         String?
+  scheduledAt  DateTime                 @map("scheduled_at")
+  status       CourtMaintenanceStatus   @default(scheduled)
+  createdAt    DateTime                 @default(now()) @map("created_at")
+  updatedAt    DateTime                 @updatedAt @map("updated_at")
+
+  tennisClub TennisClub @relation(fields: [tennisClubId], references: [id], onDelete: Cascade)
+
+  @@index([tennisClubId, scheduledAt])
+  @@map("court_maintenance")
+}
+
+model RateTier {
+  id              String       @id @default(uuid())
+  tennisClubId    String       @map("tennis_club_id")
+  title           String
+  rateCategory    RateCategory @default(court_rental) @map("rate_category")
+  status          RateStatus   @default(active)
+  basePrice       Float        @map("base_price")
+  priceMultiplier Float        @default(1.0) @map("price_multiplier")
+  notes           String?
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  tennisClub TennisClub @relation(fields: [tennisClubId], references: [id], onDelete: Cascade)
+
+  @@index([tennisClubId, rateCategory])
+  @@map("rate_tiers")
+}
+
+model StringingOrder {
+  id           String          @id @default(uuid())
+  tennisClubId String          @map("tennis_club_id")
+  customerName String          @map("customer_name")
+  stringType   String          @map("string_type")
+  racketModel  String?         @map("racket_model")
+  status       StringingStatus @default(pending)
+  price        Float           @default(0)
+  notes        String?
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+
+  tennisClub TennisClub @relation(fields: [tennisClubId], references: [id], onDelete: Cascade)
+
+  @@index([tennisClubId, status])
+  @@map("stringing_orders")
+}
